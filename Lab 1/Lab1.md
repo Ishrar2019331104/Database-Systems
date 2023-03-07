@@ -114,7 +114,7 @@ SQL allows us to use the keyword all to specify explicity that duplicates are no
 SELECT all dept_name FROM instructor
 ```
 ![SELECT](select-2.png)
-But duplicate retention is defualt, so using all is not suggested. 
+But duplicate retention is defualt, so using `all` is not suggested. 
 
 SQL clause may also contain arithmetic expressions involving operators like `+ , -, *, /` operating on constants or attributes of tuples. 
 ``` sql
@@ -128,3 +128,51 @@ To find the names of all instructors in the Computer Science department who have
 SELECT name from instructor where dept_name = 'Comp. Sci.' and salary>70000
 ```
 ![SELECT](select-5.png)
+
+
+
+## QUERIES ON MULTIPLE RELATIONS
+
+To retrieve names of all instructors along with their department names and department building name: 
+
+``` sql
+select name, instructor.dept_name, building from instructor, department where instructor.dept_name = department.dept_name
+```
+
+Cartesian product of the `instructor` relation with `teaches` relation is as follows: 
+``` sql
+SELECT * FROM instructor, teaches
+```
+![SELECT](select-6.png)
+This results in tuples(12*13 = 156) from `instructor` and `teaches` that are unrelated to each other. Instead, we would want a query involving instructor and teaches to combine a particular tuple t in instructor with only those tuples in teaches that refer to the same instructor to which t refers.
+``` sql
+SELECT name,course_id FROM instructor, teaches where instructor.ID = teaches.ID
+```
+ ![SELECT](select-7.png)
+
+ If we wished to find only instructor names and course identifiers for instructors in the Computer Science departmnet, we could add an extra predicate to the `where` clause:
+ ``` sql
+SELECT name,course_id FROM instructor, teaches where instructor.ID = teaches.ID and instructor.dept_name = 'Comp. Sci.'
+```
+ ![SELECT](select-8.png)
+
+ ## THE RENAME OPERATION
+ 
+ The `as` clause appears in both the `select` and `from` clauses.
+ - If we want the attribute name `name` to be replaced with the 
+    name `instructor_name`, we can write:
+    ``` sql
+    SELECT name as instructor_name, course_id FROM instructor, teaches WHERE instructor.ID = teaches.ID
+    ```
+    ![SELECT](rename-1.png)
+
+ - to find names and course_ID all instructors in the university who have taught some course.
+    ``` sql
+    SELECT T.name, S.course_id FROM instructor as T, teaches as S WHERE T.ID = S.ID
+    ```
+    ![SELECT](rename-2.png)
+- To compare tuples in the same relation, we would need cartesian product of a relation with itself, and without renaming, it would be impossible to distinguish one tuple from the other. For example, to find the names of all instructors whose salary is strictly greater than atleast one instructor in the Biology department,  
+     ``` sql
+    SELECT distinct T.name FROM instructor as T, instructor as S WHERE T.salary > S.salary and S.dept_name = 'Biology'
+    ```
+    ![SELECT](rename-3.png)
