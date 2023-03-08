@@ -699,11 +699,11 @@ update instructor
 set salary = salary * 1.05
 where salary <= 100000
 ```
-To set the tot cred attribute of each student
+To set the tot_cred attribute of each student
 tuple to the sum of the credits of courses successfully completed by the student,
 ``` sql
 update student
-set tot cred = (
+set tot_cred = (
 select sum(credits)
 from takes, course
 where student.ID= takes.ID and
