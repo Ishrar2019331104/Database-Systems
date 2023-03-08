@@ -1,5 +1,6 @@
 # Introduction to SQL
-
+### Ishrar Nazah Chowdhury
+### Reg. No. - 2019331104
 ## CREATE TABLE
 ``` sql
 CREATE TABLE department
@@ -367,3 +368,347 @@ having count(ID)>=2
 ```
 ![AGGREGATE](agg-9.png)
 
+<br></br>
+## NESTED SUBQUERIES
+
+### SET MEMBERSHIP
+To find all courses taught in both the Fall 2017 and Spring 2018 semesters:
+``` sql
+SELECT distinct course_id from section where semester = 'Fall' and year = 2017
+and course_id in (select course_id from section where semester = 'Spring' and year = 2018)
+```
+![NESTED](nested-1.png)
+
+To find all courses taught in the Fall 2017 semester but not in the Spring 2018 semester, 
+``` sql
+SELECT distinct course_id from section where semester = 'Fall' and year = 2017
+and course_id not in (select course_id from section where semester = 'Spring' and year = 2018)
+```
+![NESTED](nested-2.png)
+
+To select the names of instructors whose names are neither "Mozart" nor "Einstein":
+``` sql
+SELECT distinct name FROM instructor where name not in ('Mozart','Einstein')
+```
+![NESTED](nested-3.png)
+
+To find the total number of (distinct) students who have taken course sections taught by the instructor with ID 11011
+``` sql
+SELECT count(distinct ID) 
+from takes
+where (course_id, sec_id, semester, year) in (select course_id, sec_id, semester, year
+from teaches
+where teaches.ID = '10101')
+```
+![NESTED](nested-4.png)
+
+
+### SET COMPARISON
+To find the names of all instructors whose salary is greater than at least one instructor in the Biology department:
+``` sql
+SELECT name from instructor where salary > some(
+	select salary
+	from instructor
+	where dept_name = 'Biology'
+)
+```
+If we want to find the names of all instructors that have a salary value greater than that of each instructor in the Biology department,
+``` sql
+SELECT name
+from instructor
+where salary > all (
+	select salary
+	from instructor
+	where dept_name = 'Biology'
+)
+```
+
+To find the departments that have the highest average salary,
+``` sql
+SELECT dept_name
+FROM instructor
+GROUP BY dept_name
+having avg(salary)>= all(
+	select avg(salary)
+	from instructor
+	group by dept_name
+)
+```
+
+### TEST FOR EMPTY RELATIONS
+Another way to find all courses taught in both the Fall 2017 semester and in the Spring 2018 semester:
+``` sql
+SELECT course_id
+FROM section as S
+where semester = 'Fall' and year = 2017
+and
+exists(
+	select * 
+	from section as T
+	where semester = 'Spring' and year = 2018 and
+	S.course_id = T.course_id
+)
+```
+![NESTED](nested-5.png)
+
+To find all students who have taken all courses offered in the Biology department:
+``` sql
+select S.ID , S.name
+from student as S
+where not exists((select course_id
+from course
+where dept_name = 'Biology')
+except (select T.course_id
+from takes as T
+where S.ID = T.ID))
+```
+
+To find the total number of (distinct) students who have taken course sections taught by the instructor with ID 10101
+``` sql
+select count(distinct ID)
+from takes
+where exists(
+	select course_id, sec_id, semester, year
+	from teaches
+	where teaches.ID = '10101'
+	and takes.course_id = teaches.course_id
+	and takes.sec_id = teaches.sec_id
+	and takes.semester = teaches.semester
+	and takes.year = teaches.year
+)
+```
+![NESTED](nested-6.png)
+
+### TEST FOR THE ABSENCE OF DUPLICATE TUPLES
+
+To find all courses that were offered at most once in 2017:
+``` sql
+select T.course_id
+from course as T
+where unique(select R.course_id
+	from section as R
+	where T.course_id = R.course_id and
+	R.year = 2017
+)
+```
+
+An equivalent version of this query not using the `unique` construct is:
+``` sql
+select T.course_id
+from course as T
+where 1 >= (select count(R.course_id)
+from section as R
+where T.course_id = R.course_id and R.year = 2017)
+```
+![NESTED](nested-7.png)
+
+To find all courses that were offered at least twice in 2017:
+``` sql
+select T.course_id
+from course as T
+where not unique(
+	select R.course_id
+	from section as R
+	where T.course_id = R.course_id and
+	R.year = 2017
+)
+```
+
+### SUBQUERIES IN THE FROM CLAUSE
+To find the average instructors' salaries of those departments where the average salary is greater than $42,000:
+``` sql
+select dept_name, avg_salary
+from(
+	select dept_name, avg(salary) as avg_salary
+	from instructor
+	group by dept_name
+)
+where avg_salary > 42000
+```
+![NESTED](nested-8.png)
+
+We can give the subquery result relation a name, and rename the attributes, using the as clause,
+``` sql
+select dept_name, avg_salary
+from(
+	select dept_name, avg(salary)
+	from instructor
+	group by dept_name)
+	as dept_avg(dept_name, avg_salary)
+where avg_salary > 42000	
+
+```
+
+To find the maximum accross all departments of the total of all instructors:
+``` sql
+select max(tot_salary)
+from(
+	select dept_name, sum(salary)
+	from instructor
+	group by dept_name)
+	as dept_total(dept_name, tot_salary)
+
+
+```
+If we wish to print the names of each instructor, along with their salary and
+the average salary in their department,
+``` sql
+select name, salary, avg salary
+from instructor I1, lateral (select avg(salary) as avg salary
+
+from instructor I2
+where I2.dept_name= I1.dept_name)
+```
+
+### THE WITH CLAUSE
+To find those departments with the maximum budget:
+``` sql
+with max_budget (value) as
+(select max(budget)
+from department)
+select budget
+from department, max_budget
+where department.budget = max_budget.value
+```
+![NESTED](with-1.png)
+To find all departments where the total salary is greater than the average of the total salary at all departments,
+``` sql
+with dept_total (dept_name, value) as
+(select dept_name, sum(salary)
+from instructor
+group by dept_name),
+dept_total_avg(value) as
+(select avg(value)
+from dept_total)
+select dept_name
+from dept_total, dept_total_avg
+where dept_total.value > dept_total_avg.value
+```
+![NESTED](with-2.png)
+
+### SCALAR SUBQUERIES
+To find list of all departments along with the number of instructors in each department:
+``` sql
+select dept_name,
+(select count(*)
+from instructor
+where department.dept_name = instructor.dept_name)
+as num_instructors
+from department
+```
+![NESTED](subquery-1.png)
+
+### SCALAR WITHOUT A FROM CLAUSE
+If we need find the average number of sections taught (re-
+gardless of year or semester) per instructor, with sections taught by multiple instructors counted once per instructor,
+``` sql
+(select count (*) from teaches)/(select count (*) from instructor)
+```
+While this is legal in some systems, others will report an error due to the lack of a
+`from` clause. So, we rewrite this as
+``` sql
+select (select count (*) from teaches)/(select count (*) from instructor)
+from dual;
+```
+
+### DELETION
+- Delete all tuples in the instructor relation pertaining to instructors in the Finance
+department.
+	``` sql
+	delete from instructor
+	where dept_name = 'Finance'
+	```
+
+- Delete all instructors with a salary between $13,000 and $15,000.
+	``` sql
+	delete from instructor
+	where salary between 13000 and 15000
+	```
+- Delete all tuples in the instructor relation for those instructors associated with a
+department located in the Watson building.	
+	``` sql
+	delete from instructor
+	where dept_name in (select dept_name
+	from department
+	where building = 'Watson')
+	```
+- To delete the records
+of all instructors with salary below the average at the university.
+	``` sql
+	delete from instructor
+	where salary < (select avg (salary)
+	from instructor)
+	```
+
+### INSERTION
+To insert the fact that there is a course CS-437 in the Computer Science department
+with title “Database Systems” and four credit hours,
+
+``` sql
+insert into course
+values ('CS-437', 'Database Systems', 'Comp. Sci.', 4)
+```
+![NESTED](insert-1.png)
+
+For the benefit of users who may not remember the order of the attributes, SQL allows the attributes to be specified as part of the `insert` statement.
+For example, the following SQL insert statements are identical in function to the preceding one:
+``` sql
+insert into course (course id, title, dept_name, credits)
+values ('CS-437', 'Database Systems', 'Comp. Sci.', 4)
+```
+
+To make each student in the Music department who has earned
+more than 144 credit hours an instructor in the Music department with a salary of
+$18,000.
+``` sql
+insert into instructor
+select ID, name, dept_name, 18000
+from student
+where dept_name = 'Music' and tot_cred > 144
+```
+
+``` sql
+insert into student
+values ('3003', 'Green', 'Finance', null)
+```
+![NESTED](insert-2.png)
+
+The tuple inserted by this request specified that a student with ID “3003” is in the Finance department, but the tot cred value for this student is not known.
+
+
+### UPDATES
+To increase the salaries of all instructors to be increased by 5 percent,
+``` sql
+update instructor
+set salary= salary * 1.05
+```
+If a salary increase is to be paid only to instructors with a salary of less than
+$70,000,
+``` sql
+update instructor
+set salary = salary * 1.05
+where salary < 70000
+```
+
+Suppose that all instructors with salary over $100,000 receive a 3 percent raise, whereas all others receive a 5 percent raise. We could write two update statements,
+``` sql
+update instructor
+set salary = salary * 1.03
+where salary > 100000
+update instructor
+set salary = salary * 1.05
+where salary <= 100000
+```
+To set the tot cred attribute of each student
+tuple to the sum of the credits of courses successfully completed by the student,
+``` sql
+update student
+set tot cred = (
+select sum(credits)
+from takes, course
+where student.ID= takes.ID and
+takes.course id = course.course id and
+takes.grade <> 'F' and
+takes.grade is not null)
+```
+![NESTED](last-1.png)
